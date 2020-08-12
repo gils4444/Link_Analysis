@@ -1,0 +1,146 @@
+"""
+Link Analysis
+"""
+
+from bs4 import BeautifulSoup
+from urllib.request import Request, urlopen
+import networkx as nx
+import matplotlib.pyplot as plt
+import time
+from tkinter import *
+from collections import OrderedDict
+import ctypes  # An included library with Python install.
+
+
+"""
+This project is calculate PageRank (PR).
+The user insert a URL and get the PR of the URL after 2 iterations.  
+"""
+#https://www.walla.co.il/
+root = Tk()
+
+label = Label(root, text= "Enter URL")
+entry = Entry(root)
+
+label.grid(row=0)
+entry.grid(row=0, column=1)
+
+root.title("Link Analysis")
+root.geometry("250x80")
+
+button = Button(root,text="Submit")
+button.grid(column=1)
+dict=OrderedDict()
+url=""
+
+def getPrimeURL(event):
+    #This func get the url that the user insert
+    global url
+    global root
+    url = entry.get()
+    url = str(url)
+    root.quit()
+
+
+button.bind("<Button-1>", getPrimeURL)
+button.grid(row=2)
+
+
+root.mainloop()
+
+
+start = time.time()
+
+
+def gettime():
+    #brings back the current time of the durtion of working
+    return time.time()-start
+
+
+def getLinks(url):
+    #This function get all the links of an Html page
+    #Also it orgenize the prefix of the URL
+    req = Request(url)
+    html_page = urlopen(req)
+    soup = BeautifulSoup(html_page, "html.parser")
+    links = []
+
+    for link in soup.findAll('a'):
+        if not(link.get('href')==None):
+            links.append(link.get('href'))
+    prefixes = ("https://","http://")
+    for i in range(len(links)):
+        if links[i]=='none':
+            pass
+        if links[i].startswith("//"):
+            links[i] = links[i][2:]
+        if (links[i].startswith("www")):
+            links[i] = "http://" + links[i]
+        if not(links[i].startswith(prefixes)):
+            links[i]=url+links[i]
+
+    return links
+
+
+def checkURL(url):
+    # Clear all the links that are not available to open (like images etc'..)
+    try:
+        req = Request(url)
+        html_page = urlopen(req)
+        BeautifulSoup(html_page, "html.parser")
+        return True
+
+    except:
+        print('cant open URL:'+ url)
+        return False
+
+list=[]
+
+try:
+    print('start')
+    list=getLinks(url)
+except:
+    ctypes.windll.user32.MessageBoxW(0, "There is an error with the URL that was insert, the program will end now.", "ERROR", 1)
+    exit(1)
+
+
+dict[url] = list #Add a key (link) and Value (list of links) to the primery dict
+dict1 = dict.copy()#copy the dict so we can manipulate it without change it while the "FOR" loop running
+link = getLinks(url)#first iteration
+
+#seconed iteration
+for j in dict:
+    #ceack all the links in the list  and find all the links that the link point to them and add thrm to the dict
+    list = dict[j]
+    for link in list:
+        if link not in dict.keys():
+            if checkURL(link):
+                dict1[link] = getLinks(link)
+            else:
+                list.remove(link)
+
+
+
+dict=dict1.copy()
+
+
+G = nx.from_dict_of_lists(dict)#creating the Graph
+
+pr = nx.pagerank(G, alpha=0.85)#calculting the PR
+pr_sorted_by_value = OrderedDict(sorted(pr.items(), key=lambda x: x[1]))#sorting the dict by PR from low to high
+
+print("the Page Rank of the links sorted from the lower PR to the top PR")
+print(pr_sorted_by_value)
+
+size_list=[]#define list for the size
+for key in dict:
+    #insert the PR values by the order dict - dict into the list.
+    #And multiplie it by 10000 to get a "normal" value to get a normal size at the graph
+    size_list.append(pr[key]*10000)
+nx.draw(G,node_size = size_list) #without labels
+
+
+plt.show()
+
+print("Running time: ")
+print(gettime())
